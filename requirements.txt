@@ -1,0 +1,28 @@
+# =============================================================================
+# requirements.txt
+# Dependências do projeto
+# =============================================================================
+
+# Framework web assíncrono
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# ORM assíncrono e driver PostgreSQL
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+
+# [MECANISMO 1] Criptografia AES-256-GCM (Envelope Encryption)
+cryptography==43.0.3
+
+# Autenticação JWT (para simular autenticação de usuário no RLS)
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+
+# Validação e serialização
+pydantic==2.10.2
+pydantic-settings==2.6.1
+
+# Utilitários
+python-multipart==0.0.17
+httpx==0.27.2

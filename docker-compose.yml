@@ -1,0 +1,82 @@
+# =============================================================================
+# docker-compose.yml
+# Orquestra o banco PostgreSQL e a API FastAPI na mesma rede Docker.
+# Execute com: docker compose up -d
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # SERVIÇO: Banco de Dados PostgreSQL
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: secure_db
+    restart: unless-stopped
+
+    # Variáveis de ambiente do Postgres (credenciais do superusuário)
+    environment:
+      POSTGRES_DB: securedb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: SuperSecret123!
+
+    # [MECANISMO 4 - MENOR PRIVILÉGIO]
+    # O init.sql é executado automaticamente na primeira inicialização do container.
+    # Ele cria roles restritas, tabelas, RLS, triggers e a view mascarada.
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pg_data:/var/lib/postgresql/data
+
+    ports:
+      - "5432:5432"
+
+    networks:
+      - secure_net
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d securedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # SERVIÇO: API FastAPI
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: secure_api
+    restart: unless-stopped
+
+    # Variáveis de ambiente injetadas na aplicação Python
+    environment:
+      # Credenciais da role restrita (MENOR PRIVILÉGIO - MECANISMO 4)
+      DATABASE_URL: postgresql+asyncpg://api_user:ApiUserPass456!@db:5432/securedb
+
+      # [MECANISMO 1 - ENVELOPE ENCRYPTION]
+      # KEK (Key Encryption Key) - em produção real, viria de um HSM/Vault
+      KEK_HEX: "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+
+      # Chave secreta para geração dos tokens JWT
+      JWT_SECRET: "jwt-super-secret-change-in-production"
+
+    ports:
+      - "8000:8000"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    networks:
+      - secure_net
+
+# ---------------------------------------------------------------------------
+# VOLUMES e REDES
+# ---------------------------------------------------------------------------
+volumes:
+  pg_data:
+
+networks:
+  secure_net:
+    driver: bridge
