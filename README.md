@@ -99,62 +99,31 @@ docker compose logs -f
 
 ---
 
-## 🧪 Roteiro de Testes dos 4 Mecanismos
+## 🧪 Testes Automatizados e Provas de Segurança
 
-Acesse **http://localhost:8000/docs** e siga:
+Para facilitar a validação e demonstração dos 4 mecanismos implementados, o projeto conta com uma suíte de testes E2E (API) e provas diretas no banco de dados, bypassando a aplicação.
 
-### Teste 1 — Envelope Encryption
-1. `POST /auth/register` → crie usuário `alice` / `senha12345`
-2. `POST /auth/login` → obtenha o token
-3. Clique em **Authorize** → cole o token
-4. `POST /records` → crie um registro com CPF e valor
-5. Conecte-se ao banco: `docker exec -it secure_db psql -U postgres -d securedb`
-6. `SELECT cpf_enc, valor_enc, dek_enc FROM financial_records;`
-7. **Observe:** os dados aparecem como base64 cifrado — indecifráveis sem a KEK
+Veja as instruções completas de como executar os scripts de teste no arquivo dedicado:
+👉 **[INSTRUCOES_TESTE.md](./INSTRUCOES_TESTE.md)**
 
-### Teste 2 — Row-Level Security
-1. Com `alice` logada, crie 2 registros
-2. `POST /auth/register` → crie usuário `bob` / `senha12345`
-3. Faça login como `bob` e use o novo token
-4. `GET /records` → **Bob não verá nenhum registro de Alice**
-5. Tente `GET /records/{id_de_alice}` → 404 (RLS bloqueia silenciosamente)
-
-### Teste 3 — Audit Hash Chain
-1. Execute algumas operações (INSERT, UPDATE, DELETE)
-2. `GET /audit/logs` → veja os logs com `row_hash` e `prev_hash`
-3. `GET /audit/verify` → todos `is_valid: true` ✅
-4. **Simule adulteração:**
-   ```sql
-   -- No psql como postgres (superusuário):
-   UPDATE audit_log SET old_data = '{"adulterado": true}' WHERE id = 1;
-   ```
-5. `GET /audit/verify` → entradas após id=1 mostram `is_valid: false` ❌
-
-### Teste 4 — Mascaramento Dinâmico
-1. `GET /records/masked` → dados mascarados retornados da view SQL
-2. No psql como `api_user`:
-   ```bash
-   docker exec -it secure_db psql -U api_user -d securedb
-   ```
-   ```sql
-   SELECT * FROM financial_records_masked;
-   -- Veja: nome mascarado, CPF "[CIFRADO]", DEK "[PROTEGIDO]"
-   
-   -- Tente acessar tabela raw (deve falhar sem RLS):
-   SELECT * FROM financial_records;
-   -- Retorna vazio (RLS filtra tudo sem SET LOCAL)
-   ```
+### Scripts Disponíveis
+1. **`test_security.py`**: Utiliza `pytest` para simular requisições reais à API e comprovar o bloqueio de acessos indevidos via **Row-Level Security (RLS)** e o Mascaramento de dados restritos.
+2. **`prove_security.py`**: Conecta-se diretamente ao PostgreSQL via `psycopg2` (como Super Administrador), burlando a API. Serve para provar matematicamente a integridade da **Hash Chain** (Auditoria) e a absoluta ilegibilidade dos dados criptografados no armazenamento físico (**Envelope Encryption**).
+3. **Teste Interativo (Manual):** Acesse a interface Swagger em `http://localhost:8000/docs` para interagir visualmente com os endpoints e simular os acessos.
 
 ---
 
 ## 📁 Estrutura do Projeto
 
-```
+```text
 Back-End-banco-de-dados/
 ├── docker-compose.yml          # Orquestração dos serviços
 ├── Dockerfile                  # Imagem da API FastAPI
 ├── requirements.txt            # Dependências Python
 ├── init.sql                    # Schema, RLS, triggers, RBAC
+├── test_security.py            # Suíte de Testes Automatizados da API
+├── prove_security.py           # Script de Prova Bypass direto no BD
+├── INSTRUCOES_TESTE.md         # Roteiro de Testes para Avaliação
 ├── README.md                   # Este arquivo
 └── app/
     ├── __init__.py
